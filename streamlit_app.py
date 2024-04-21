@@ -17,6 +17,7 @@ import textwrap
 from urllib.error import URLError
 
 import pandas as pd
+import geopandas as gpd
 import pydeck as pdk
 import streamlit as st
 
@@ -32,55 +33,10 @@ def show_code(demo):
 
 
 def mapping_demo():
-    @st.cache
-    def from_data_file(filename):
-        url = (
-            "http://raw.githubusercontent.com/streamlit/"
-            "example-data/master/hello/v1/%s" % filename
-        )
-        return pd.read_json(url)
-
     try:
         ALL_LAYERS = {
-            "Bike Rentals": pdk.Layer(
-                "HexagonLayer",
-                data=from_data_file("bike_rental_stats.json"),
-                get_position=["lon", "lat"],
-                radius=200,
-                elevation_scale=4,
-                elevation_range=[0, 1000],
-                extruded=True,
-            ),
-            "Bart Stop Exits": pdk.Layer(
-                "ScatterplotLayer",
-                data=from_data_file("bart_stop_stats.json"),
-                get_position=["lon", "lat"],
-                get_color=[200, 30, 0, 160],
-                get_radius="[exits]",
-                radius_scale=0.05,
-            ),
-            "Bart Stop Names": pdk.Layer(
-                "TextLayer",
-                data=from_data_file("bart_stop_stats.json"),
-                get_position=["lon", "lat"],
-                get_text="name",
-                get_color=[0, 0, 0, 200],
-                get_size=15,
-                get_alignment_baseline="'bottom'",
-            ),
-            "Outbound Flow": pdk.Layer(
-                "ArcLayer",
-                data=from_data_file("bart_path_stats.json"),
-                get_source_position=["lon", "lat"],
-                get_target_position=["lon2", "lat2"],
-                get_source_color=[200, 30, 0, 160],
-                get_target_color=[200, 30, 0, 160],
-                auto_highlight=True,
-                width_scale=0.0001,
-                get_width="outbound",
-                width_min_pixels=3,
-                width_max_pixels=30,
-            ),
+            "state": polygon,
+
         }
         st.sidebar.markdown("### Map Layers")
         selected_layers = [
@@ -92,12 +48,7 @@ def mapping_demo():
             st.pydeck_chart(
                 pdk.Deck(
                     map_style="mapbox://styles/mapbox/light-v9",
-                    initial_view_state={
-                        "latitude": 37.76,
-                        "longitude": -122.4,
-                        "zoom": 11,
-                        "pitch": 50,
-                    },
+                    initial_view_state=view_state,
                     layers=selected_layers,
                 )
             )
@@ -112,6 +63,36 @@ def mapping_demo():
             % e.reason
         )
 
+
+# Load data from a JSON file into a pandas DataFrame
+# The parameters are set to ensure that the data is loaded as strings without any conversion
+df = pd.read_json("sample.json", orient="index", convert_dates=False,
+                  keep_default_dates=False, convert_axes=False, dtype=int, precise_float=False, date_unit=None, )
+# Reset the index of the DataFrame
+df.reset_index(inplace=True)
+# Rename the columns of the DataFrame
+df.columns = ["GEOID", "population"]
+
+# Load a GeoJSON file into a GeoDataFrame
+gdf = gpd.read_file('mi1.json', geometry='geometry')
+# Merge the DataFrame and GeoDataFrame on the 'GEOID' column
+gdf = gdf.merge(df, on='GEOID')
+gdf["color"] = gdf['population'] / gdf['population'].max()
+
+# Create a new GeoDataFrame for the centroids of the geometries in the original GeoDataFrame
+# Also, copy the 'population' column from the original GeoDataFrame
+centroids = gpd.GeoDataFrame(geometry=gdf.centroid, crs=gdf.crs)
+centroids["population"] = gdf['population']
+
+# Define the initial view state for the pydeck visualization
+# The latitude and longitude are set to the mean of the y and x coordinates of the centroids, respectively
+view_state = pdk.ViewState(latitude=centroids.centroid.y.mean(), longitude=centroids.centroid.x.mean(), zoom=6,
+                           max_zoom=12)
+
+# Define a GeoJsonLayer for the geometries in the original GeoDataFrame
+polygon = pdk.Layer("GeoJsonLayer", gdf, stroked=True, filled=True, opacity=0.7, get_line_color=[255, 0, 0],
+                    get_fill_color="[255, 140, 0, 254 * color]",
+                    line_width_min_pixels=2)
 
 st.set_page_config(page_title="Mapping Demo", page_icon="🌍")
 st.markdown("# Mapping Demo")

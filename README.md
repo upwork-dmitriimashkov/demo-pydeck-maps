@@ -8,7 +8,7 @@ A Streamlit app demonstrating usage of the pydeck library to display geospacial 
 
 ```
 pip install --upgrade streamlit pydeck
-streamlit run https://raw.githubusercontent.com/streamlit/demo-pydeck-maps/main/streamlit_app.py
+streamlit run streamlit_app.py
 ```
 
 ### Questions? Comments?
