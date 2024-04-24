@@ -7,8 +7,9 @@ A Streamlit app demonstrating usage of the pydeck library to display geospacial 
 ## Run this demo locally
 
 ```
-pip install --upgrade streamlit pydeck
-streamlit run streamlit_app.py
+poetry shell
+poetry install
+poetry run streamlit run streamlit_app.py
 ```
 
 ### Questions? Comments?
